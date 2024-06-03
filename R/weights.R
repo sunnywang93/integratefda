@@ -6,6 +6,7 @@
 #' @param x Vector of points.
 #' @returns List, containing the associated degree for each sampling
 #' point.
+#' @export
 
 
 degree <- function(x) {
@@ -44,6 +45,7 @@ degree <- function(x) {
 #' @param cdf Function, representation the empirical distribution function.
 #' @returns List, containing the associated leave-one-out cumulative volume
 #' for each sampling point.
+#' @export
 
 cum_vol <- function(x, cdf = identity) {
 
@@ -95,6 +97,7 @@ cum_vol <- function(x, cdf = identity) {
 #' @param x Vector of points.
 #' @returns List, containing the points and its associated cumulative
 #' volume.
+#' @export
 
 cum_vol_unif <- function(x) {
 
@@ -126,11 +129,31 @@ cum_vol_unif <- function(x) {
 
 }
 
+#' Compute unnormalised weights for leave-one-out control neighbours
+#'
+#' @param x Vector of sampling points.
+#' @param cdf Function, representing the cumulative distribution function.
+#' @returns
+#' @export
+#'
+weights_loo <- function(x, cdf = identity) {
+
+  cm_list <- cum_vol(x, cdf = cdf)
+  dm_list <- degree(x)
+
+  wm <- 1 + cm_list$vol - dm_list$deg
+
+  list(x = x,
+       weights = wm)
+
+}
+
 
 #' Calculates the leave-one-out-weights for the uniform distribution
 #'
 #' @param x Vector of points.
 #' @returns List, containing the points and asssociated weights.
+#' @export
 
 weights_loo_unif <- function(x) {
 
@@ -145,8 +168,28 @@ weights_loo_unif <- function(x) {
 }
 
 
+#' Generate points from a convex density function
+#'
+#' Points are generated using the inverse transform sampling method.
+#'
+#' @param a Numeric, multiplicative parameter.
+#' @param n Numeric, number of points to generate
+#' @returns Vector of sample points.
+#' @export
 
+boat_cdf <- function(a, n) {
 
+  if(a < 0 & a >= 12) {
+    stop("a is out of range!")
+  }
 
+  b <- 1 - (a / 12)
+  U <- runif(n)
+  coef_inv <- purrr::map(U, ~c(-.x, a/4 + b, -a/2, a/3))
+  roots_inv <- purrr::map(coef_inv, ~polyroot(.x))
+  id_real <- purrr::map(roots_inv,
+                        ~which((abs(Im(.x)) < 1e-7) & (Re(.x) >= 0) &(Re(.x) < 1)))
+  purrr::map2_dbl(roots_inv, id_real, ~Re(.x[.y]))
 
+}
 
