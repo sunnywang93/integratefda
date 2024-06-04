@@ -23,7 +23,21 @@ n <- 100
 m <- 25
 
 
-points_list <- purrr::map(seq_len(1000), function(x) sort(runif(500)))
+points_list <- purrr::map(seq_len(100), function(x) sort(runif(20)))
+
+purrr::map(points_list, ~degree(.x)$deg^2) |>
+  (\(x) Reduce('+', x) / length(x))()
+
+purrr::map(points_list, ~cum_vol(.x)$vol^2) |>
+  (\(x) Reduce('+', x) / length(x))()
+
+purrr::map(points_list, ~cum_vol(.x)$vol * degree(.x)$deg)   |>
+  (\(x) Reduce('+', x) / length(x))()
+
+purrr::map(points_list, ~cum_vol(.x)$vol^2 + degree(.x)$deg^2 -
+             2 * cum_vol(.x)$vol * degree(.x)$deg)   |>
+  (\(x) Reduce('+', x) / length(x))()
+
 cdf <- function(x) 1/3*(x - 0.5)^3 + 11*x/12 + 1/24
 # some choices of function to play
 wm_sq_limit(points_list = points_list,
