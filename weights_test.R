@@ -141,3 +141,17 @@ xi_true <- Reduce('+', map(x_list, ~.x$xi)) / length(x_list)
 
 mean(abs(xi_hat_avg - xi_true))
 
+
+
+
+
+
+sapply(seq_along(x_list$xi),
+       function(x) x_list$xi[x] %in% c(test$ci_l[x], test$ci_u[x]))
+
+
+
+
+
+
+

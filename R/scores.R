@@ -50,16 +50,16 @@ mc_scores <- function(y_list, mu_list, psi_list, pdf_list, cdf) {
 #' of leave-one-out control neighbours
 #'
 #' @param scores_list List, containing the elements:
-#' -**$weights** Vector, containing the weights associated to each score.
-#' -**$xi_hat** Vector, containing the estimated scores.
-#' -**$varphi** Matrix, containing the evaluated functional, with rows carrying
+#' - **$weights** Vector, containing the weights associated to each score.
+#' - **$xi_hat** Vector, containing the estimated scores.
+#' - **$varphi** Matrix, containing the evaluated functional, with rows carrying
 #' the sampling points and columns carrying the components.
 #' @param conf_level Numeric, indicating the confidence level in which the
 #' intervals should be constructed.
 #' @returns List, containing the elements:
-#' -**$scores** Vector, containing the estimated scores.
-#' -**$ci_l** Vector, containing the lower bound of the confidence interval.
-#' -**$ci_u** Vector, containing the upper bound of the confidence interval.
+#' - **$scores** Vector, containing the estimated scores.
+#' - **$ci_l** Vector, containing the lower bound of the confidence interval.
+#' - **$ci_u** Vector, containing the upper bound of the confidence interval.
 #' @export
 
 confint_mc <- function(scores_list, conf_level) {
@@ -77,6 +77,48 @@ confint_mc <- function(scores_list, conf_level) {
 
 }
 
+#' Computes the confidence intervals for scores based on the asymptotic limit
+#' of leave-one-out control neighbours
+#'
+#' @param scores_list List, containing the elements:
+#' - **$weights** Vector, containing the weights associated to each score.
+#' - **$xi_hat** Vector, containing the estimated scores.
+#' - **$varphi** Matrix, containing the evaluated functional, with rows carrying
+#' the sampling points and columns carrying the components.
+#' @param pdf_list List, containing the elements:
+#' - **t** Vector containing the sampling points.
+#' - **x** Vector containing the observed points.
+#' @param conf_level Numeric, indicating the confidence level in which the
+#' intervals should be constructed.
+#' @returns List, containing the elements:
+#' - **$scores** Vector, containing the estimated scores.
+#' - **$ci_l** Vector, containing the lower bound of the confidence interval.
+#' - **$ci_u** Vector, containing the upper bound of the confidence interval.
+#' @export
+
+
+confint_lim <- function(scores_list, pdf_list, conf_level) {
+
+  int_varphi <- apply(scores_list$varphi^2 * pdf_list$x,
+                      2,
+                      function(x) pracma::trapz(x = pdf_list$t,
+                                                y = x)
+  )
+
+
+  sm <- sqrt(5/2) * (length(scores_list$weights))^(-1/2) * (int_varphi)^(1/2)
+
+  crit <- 1 - conf_level
+
+  ci_l <- scores_list$xi_hat - qnorm(1 - crit/2) * sm
+  ci_u <- scores_list$xi_hat + qnorm(1 - crit/2) * sm
+
+  list(scores = scores_list$xi_hat,
+       ci_l = ci_l,
+       ci_u = ci_u)
+
+
+}
 
 
 
