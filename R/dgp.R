@@ -28,7 +28,7 @@ boat_cdf <- function(a, n) {
 #'
 #' @param k Numeric, number of basis functions.
 #' @param n Numeric, number of sampling points.
-#' @returns List, containing the sampling and observed points.
+#' @returns List, containing the sampling points, observed points, and normalised scores.
 #' @export
 
 bm_kl <- function(k, n) {
@@ -47,10 +47,17 @@ bm_kl <- function(k, n) {
 
   list(t = x,
        x = y,
-       xi = xi_k)
+       xi = xi_k * sqrt(lambda_k))
 
 }
 
+
+#' Generate brownian motion using the KL decomposition on a random grid of points
+#'
+#' @param k Numeric, number of basis functions.
+#' @param x Vector containing the sampling points.
+#' @returns List, containing the sampling points, observed points, and normalised scores.
+#' @export
 
 bm_kl_rd <- function(k, x) {
 
@@ -66,7 +73,7 @@ bm_kl_rd <- function(k, x) {
 
   list(t = x,
        x = y,
-       xi = xi_k)
+       xi = xi_k * sqrt(lambda_k))
 
 }
 

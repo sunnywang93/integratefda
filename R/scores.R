@@ -21,7 +21,7 @@
 #' @export
 
 
-mc_scores <- function(y_list, mu_list, psi_list, pdf_list, cdf) {
+mc_scores <- function(y_list, mu_list, psi_list, pdf_list, cdf, noise_sd) {
 
   if(!is.function(cdf)) {
     cdf_fun <- function(x) {
@@ -37,10 +37,13 @@ mc_scores <- function(y_list, mu_list, psi_list, pdf_list, cdf) {
 
   varphi <- (y_list$y - mu_list$x) * psi_list$X / pdf_list$x
 
+  varphi_ci <- noise_sd * psi_list$X / pdf_list$x
+
   list(t = wm_loo$x,
        weights = wm_loo$weights,
        xi_hat = colSums(wm_loo$weights * varphi),
-       varphi = varphi
+       varphi = varphi,
+       varphi_ci = varphi_ci
   )
 
 }
@@ -52,7 +55,7 @@ mc_scores <- function(y_list, mu_list, psi_list, pdf_list, cdf) {
 #' @param scores_list List, containing the elements:
 #' - **$weights** Vector, containing the weights associated to each score.
 #' - **$xi_hat** Vector, containing the estimated scores.
-#' - **$varphi** Matrix, containing the evaluated functional, with rows carrying
+#' - **$varphi_ci** Matrix, containing the evaluated functional, with rows carrying
 #' the sampling points and columns carrying the components.
 #' @param conf_level Numeric, indicating the confidence level in which the
 #' intervals should be constructed.
@@ -64,7 +67,7 @@ mc_scores <- function(y_list, mu_list, psi_list, pdf_list, cdf) {
 
 confint_mc <- function(scores_list, conf_level) {
 
-  sm <- sqrt(colSums(scores_list$weights^2 * scores_list$varphi^2))
+  sm <- sqrt(colSums(scores_list$weights^2 * scores_list$varphi_ci^2))
 
   crit <- 1 - conf_level
 
@@ -73,7 +76,8 @@ confint_mc <- function(scores_list, conf_level) {
 
   list(scores = scores_list$xi_hat,
        ci_l = ci_l,
-       ci_u = ci_u)
+       ci_u = ci_u,
+       sm = sm)
 
 }
 
@@ -99,7 +103,7 @@ confint_mc <- function(scores_list, conf_level) {
 
 confint_lim <- function(scores_list, pdf_list, conf_level) {
 
-  int_varphi <- apply(scores_list$varphi^2 * pdf_list$x,
+  int_varphi <- apply(scores_list$varphi_ci^2 * pdf_list$x,
                       2,
                       function(x) pracma::trapz(x = pdf_list$t,
                                                 y = x)
@@ -115,7 +119,8 @@ confint_lim <- function(scores_list, pdf_list, conf_level) {
 
   list(scores = scores_list$xi_hat,
        ci_l = ci_l,
-       ci_u = ci_u)
+       ci_u = ci_u,
+       sm = sm)
 
 
 }
