@@ -52,5 +52,21 @@ bm_kl <- function(k, n) {
 }
 
 
+bm_kl_rd <- function(k, x) {
 
+  ek <- sqrt(2) * sin(outer(pi * x, seq_len(k) - 0.5))
+
+  lambda_k <- ((seq_len(k) - 0.5) * pi)^(-2)
+
+  xi_k <- rnorm(n = k, mean = 0, sd = 1)
+
+  y <- sweep(ek, 2, sqrt(lambda_k), FUN = "*") |>
+    sweep(2, xi_k, FUN = "*") |>
+    rowSums()
+
+  list(t = x,
+       x = y,
+       xi = xi_k)
+
+}
 
