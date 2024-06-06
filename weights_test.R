@@ -23,7 +23,7 @@ n <- 100
 m <- 25
 
 
-points_list <- purrr::map(seq_len(100), function(x) sort(runif(20)))
+points_list <- purrr::map(seq_len(10000), function(x) sort(runif(200)))
 
 purrr::map(points_list, ~degree(.x)$deg^2) |>
   (\(x) Reduce('+', x) / length(x))()
@@ -54,4 +54,44 @@ wm_sq_limit(points_list = points_list,
             phi = function(x) (sin(x))^2,
             cdf = cdf) |>
   mean()
+
+
+
+
+n_basis <- 50
+x_list <- bm_kl(k = 50, n = 501)
+t_unif <- sort(runif(n = 201))
+t_idx <- sapply(t_unif, function(ti) which.min(abs(ti - x_list$t)))
+y_list <- list(t = t_unif,
+               x = x_list$x[t_idx],
+               y = x_list$x[t_idx] + rnorm(length(t_idx), 0, 0))
+
+mu_list <- list(t = t_unif,
+                x = rep(0, length(t_unif)))
+
+
+psi_list <- list(t = t_unif,
+                 X = sqrt(2) * sin(outer(pi * t_unif, seq_len(n_basis) - 0.5)))
+
+pdf_list <- list(t = t_unif,
+                 x = rep(1, length(t_unif)))
+
+cdf <- identity
+
+xi_hat <- mc_scores(y_list = y_list,
+                    mu_list = mu_list,
+                    psi_list = psi_list,
+                    pdf_list = pdf_list,
+                    cdf = cdf)
+
+# cdf <- list(t = t_unif,
+#             x = t_unif)
+
+# cdf_eval <- c(pracma::cumtrapz(x = f_list$t,
+#                                y = f_list$x))
+
+
+
+
+
 

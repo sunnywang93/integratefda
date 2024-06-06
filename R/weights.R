@@ -141,7 +141,7 @@ weights_loo <- function(x, cdf = identity) {
   cm_list <- cum_vol(x, cdf = cdf)
   dm_list <- degree(x)
 
-  wm <- 1 + cm_list$vol - dm_list$deg
+  wm <- (1 + cm_list$vol - dm_list$deg) / length(x)
 
   list(x = x,
        weights = wm)
@@ -160,7 +160,7 @@ weights_loo_unif <- function(x) {
   cm_list <- cum_vol_unif(x)
   dm_list <- degree(x)
 
-  wm <- (1 + cm_list$vol - dm_list$deg)
+  wm <- (1 + cm_list$vol - dm_list$deg) / length(x)
 
   list(x = x,
        weights = wm)
