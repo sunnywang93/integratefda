@@ -59,13 +59,18 @@ bm_kl <- function(k, n) {
 #' @returns List, containing the sampling points, observed points, and normalised scores.
 #' @export
 
-bm_kl_rd <- function(k, x) {
+bm_kl_rd <- function(k, x, lambda_rate, xi_dist, ...) {
 
   ek <- sqrt(2) * sin(outer(pi * x, seq_len(k) - 0.5))
 
-  lambda_k <- ((seq_len(k) - 0.5) * pi)^(-2)
+  lambda_k <- ((seq_len(k) - 0.5) * pi)^(-lambda_rate)
 
-  xi_k <- rnorm(n = k, mean = 0, sd = 1)
+  if(missing(xi_dist)) {
+    xi_k <- rnorm(n = k, mean = 0, sd = 1)
+  } else {
+    xi_k <- xi_dist(n = k, ...)
+  }
+
 
   y <- sweep(ek, 2, sqrt(lambda_k), FUN = "*") |>
     sweep(2, xi_k, FUN = "*") |>
@@ -76,4 +81,8 @@ bm_kl_rd <- function(k, x) {
        xi = xi_k * sqrt(lambda_k))
 
 }
+
+
+
+
 
