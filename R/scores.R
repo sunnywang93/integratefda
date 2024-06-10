@@ -98,6 +98,7 @@ confint_mc <- function(scores_list, conf_level) {
 #' - **$scores** Vector, containing the estimated scores.
 #' - **$ci_l** Vector, containing the lower bound of the confidence interval.
 #' - **$ci_u** Vector, containing the upper bound of the confidence interval.
+#' - **$sm** Vector, containing the standard deviation.
 #' @export
 
 

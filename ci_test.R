@@ -1,15 +1,20 @@
 sigma <- 0.1
 n_basis <- 200
 
-test <- lapply(seq_len(500), function(rep) {
+
+
+test <- lapply(seq_len(200), function(rep) {
 
 
 t_unif <- sort(runif(n = 101))
 x_list <- bm_kl_rd(k = n_basis, x = t_unif)
+
+#het_noise <- sigma * (1 + sin(8 * pi * t_unif)) * rnorm(length(t_unif), 0, 1)
 y_list <- list(t = t_unif,
                x = x_list$x,
-               y = x_list$x + rnorm(length(t_unif), 0, sigma))
+               y = x_list$x + rnorm(length(t_unif), sd = sigma) + rnorm(1))
 
+lambda <- ((seq_len(n_basis) - 0.5) * pi)^(-2)
 
 mu_list <- list(t = t_unif,
                 x = rep(0, length(t_unif)))
@@ -17,6 +22,13 @@ mu_list <- list(t = t_unif,
 
 psi_list <- list(t = t_unif,
                  X = sqrt(2) * sin(outer(pi * t_unif, seq_len(n_basis) - 0.5)))
+
+Sigma_mat <- lapply(seq_len(n_basis),
+                    function(j) lambda[j] * tcrossprod(psi_list$X[, j])) |>
+  (\(x) Reduce('+', x))() |>
+  (\(x) x + sigma^2 * diag(nrow = nrow(x), ncol = ncol(x)))()
+
+xi_pace <- pace_scores(y_list, lambda, psi_list, Sigma_mat, mu_list)
 
 pdf_list <- list(t = t_unif,
                  x = rep(1, length(t_unif)))
@@ -63,3 +75,21 @@ lim_pct <- Reduce('+', purrr::map(test, ~.x$lim_count))
 
 exact_pct[1:10] / 500
 exact_pct[1:10] / 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
