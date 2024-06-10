@@ -31,6 +31,7 @@ List, containing the elements:
 \item \strong{$scores} Vector, containing the estimated scores.
 \item \strong{$ci_l} Vector, containing the lower bound of the confidence interval.
 \item \strong{$ci_u} Vector, containing the upper bound of the confidence interval.
+\item \strong{$sm} Vector, containing the standard deviation.
 }
 }
 \description{

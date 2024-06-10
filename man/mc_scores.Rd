@@ -4,7 +4,7 @@
 \alias{mc_scores}
 \title{Compute scores using leave-one-out control neighbours monte carlo integration}
 \usage{
-mc_scores(y_list, mu_list, psi_list, pdf_list, cdf)
+mc_scores(y_list, mu_list, psi_list, pdf_list, cdf, noise_sd)
 }
 \arguments{
 \item{y_list}{List of the observations, containing the elements:

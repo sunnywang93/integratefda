@@ -12,7 +12,7 @@ confint_mc(scores_list, conf_level)
 \itemize{
 \item \strong{$weights} Vector, containing the weights associated to each score.
 \item \strong{$xi_hat} Vector, containing the estimated scores.
-\item \strong{$varphi} Matrix, containing the evaluated functional, with rows carrying
+\item \strong{$varphi_ci} Matrix, containing the evaluated functional, with rows carrying
 the sampling points and columns carrying the components.
 }}
 

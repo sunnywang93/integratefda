@@ -12,7 +12,7 @@ bm_kl(k, n)
 \item{n}{Numeric, number of sampling points.}
 }
 \value{
-List, containing the sampling and observed points.
+List, containing the sampling points, observed points, and normalised scores.
 }
 \description{
 Generate brownian motion using the KL decomposition
