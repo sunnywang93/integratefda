@@ -38,6 +38,9 @@ If list, it should contain the elements:
 \item \strong{$t} Vector of sampling points.
 \item \strong{$x} Vector of observed points.
 }}
+
+\item{noise_sd}{Numeric or vector, representing the standard deviation of the
+noise that can depend on the design points.}
 }
 \value{
 Vector containing the estimated scores.

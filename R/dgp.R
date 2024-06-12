@@ -29,7 +29,6 @@ boat_cdf <- function(a, n) {
 #' @param k Numeric, number of basis functions.
 #' @param n Numeric, number of sampling points.
 #' @returns List, containing the sampling points, observed points, and normalised scores.
-#' @export
 
 bm_kl <- function(k, n) {
 
@@ -56,33 +55,54 @@ bm_kl <- function(k, n) {
 #'
 #' @param k Numeric, number of basis functions.
 #' @param x Vector containing the sampling points.
+#' @param lambda_rate Numeric, the polynomial rate of decay of eigenvalues.
+#' @param norm_factor Numeric, a normalising factor to make the scores unit variance
+#' when using a distribution that doesn't have unit variance by default.
+#' @param xi_dist Function, indicating the distribution in which the scores
+#' should be simulated from. Arguments associated to this function should be passed as
+#' separate arguments.
 #' @returns List, containing the sampling points, observed points, and normalised scores.
 #' @export
 
-bm_kl_rd <- function(k, x, lambda_rate, xi_dist, ...) {
+bm_kl_rd <- function(k, x, lambda_rate, norm_factor, xi_dist, ...) {
 
   ek <- sqrt(2) * sin(outer(pi * x, seq_len(k) - 0.5))
 
   lambda_k <- ((seq_len(k) - 0.5) * pi)^(-lambda_rate)
 
   if(missing(xi_dist)) {
-    xi_k <- rnorm(n = k, mean = 0, sd = 1)
+    xi_k <- rnorm(n = k, mean = 0, sd = 1) * sqrt(lambda_k)
   } else {
-    xi_k <- xi_dist(n = k, ...)
+    xi_k <- xi_dist(n = k, ...) * norm_factor * sqrt(lambda_k)
   }
 
-
-  y <- sweep(ek, 2, sqrt(lambda_k), FUN = "*") |>
-    sweep(2, xi_k, FUN = "*") |>
+  y <- sweep(ek, 2, xi_k, FUN = "*") |>
     rowSums()
 
   list(t = x,
        x = y,
-       xi = xi_k * sqrt(lambda_k))
+       xi = xi_k)
 
 }
 
 
+kl_rd_poly <- function(k, x, lambda_rate) {
 
+  ek <- sqrt(2) * sin(outer(pi * x, seq_len(k) - 0.5))
+
+  lambda_k <- ((seq_len(k) - 0.5) * pi)^(-lambda_rate)
+
+  xi_k1 <- rnorm(n = floor(k/2))
+  xi_k2 <- (xi_k1^2 - 1) * sqrt(1/2)
+  xi_k <- as.vector(rbind(xi_k1, xi_k2)) * sqrt(lambda_k)
+
+  y <- sweep(ek, 2, xi_k, FUN = "*") |>
+    rowSums()
+
+  list(t = x,
+       x = y,
+       xi = xi_k)
+
+}
 
 

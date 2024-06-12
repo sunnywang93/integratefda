@@ -4,12 +4,21 @@
 \alias{bm_kl_rd}
 \title{Generate brownian motion using the KL decomposition on a random grid of points}
 \usage{
-bm_kl_rd(k, x)
+bm_kl_rd(k, x, lambda_rate, norm_factor, xi_dist, ...)
 }
 \arguments{
 \item{k}{Numeric, number of basis functions.}
 
 \item{x}{Vector containing the sampling points.}
+
+\item{lambda_rate}{Numeric, the polynomial rate of decay of eigenvalues.}
+
+\item{norm_factor}{Numeric, a normalising factor to make the scores unit variance
+when using a distribution that doesn't have unit variance by default.}
+
+\item{xi_dist}{Function, indicating the distribution in which the scores
+should be simulated from. Arguments associated to this function should be passed as
+separate arguments.}
 }
 \value{
 List, containing the sampling points, observed points, and normalised scores.

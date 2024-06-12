@@ -17,6 +17,8 @@
 #' If list, it should contain the elements:
 #' - **$t** Vector of sampling points.
 #' - **$x** Vector of observed points.
+#' @param noise_sd Numeric or vector, representing the standard deviation of the
+#' noise that can depend on the design points.
 #' @returns Vector containing the estimated scores.
 #' @export
 
