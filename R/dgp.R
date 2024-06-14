@@ -56,6 +56,8 @@ bm_kl <- function(k, n) {
 #' @param k Numeric, number of basis functions.
 #' @param x Vector containing the sampling points.
 #' @param lambda_rate Numeric, the polynomial rate of decay of eigenvalues.
+#' @param norm_constant Numeric, a normalising constant to make the scores centered
+#' when using distribution that doesn't have zero mean.
 #' @param norm_factor Numeric, a normalising factor to make the scores unit variance
 #' when using a distribution that doesn't have unit variance by default.
 #' @param xi_dist Function, indicating the distribution in which the scores
@@ -64,7 +66,7 @@ bm_kl <- function(k, n) {
 #' @returns List, containing the sampling points, observed points, and normalised scores.
 #' @export
 
-bm_kl_rd <- function(k, x, lambda_rate, norm_factor, xi_dist, ...) {
+bm_kl_rd <- function(k, x, lambda_rate, norm_constant, norm_factor, xi_dist, ...) {
 
   ek <- sqrt(2) * sin(outer(pi * x, seq_len(k) - 0.5))
 
@@ -73,7 +75,7 @@ bm_kl_rd <- function(k, x, lambda_rate, norm_factor, xi_dist, ...) {
   if(missing(xi_dist)) {
     xi_k <- rnorm(n = k, mean = 0, sd = 1) * sqrt(lambda_k)
   } else {
-    xi_k <- xi_dist(n = k, ...) * norm_factor * sqrt(lambda_k)
+    xi_k <- (xi_dist(n = k, ...) - norm_constant) * norm_factor * sqrt(lambda_k)
   }
 
   y <- sweep(ek, 2, xi_k, FUN = "*") |>

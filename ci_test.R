@@ -9,8 +9,8 @@ n_basis <- 200
 lambda_pow <- 2
 x_length <- 51
 ci_level <- 0.95
-#xi_cdf <- rt
-xi_cdf <- rchisq
+xi_cdf <- rt
+#xi_cdf <- rchisq
 #xi_cdf <- rnorm
 points_dist <- runif
 #cdf <- function(x) a/3*(x - 0.5)^3 + b*x + a/24
@@ -19,8 +19,7 @@ rout <- 500
 a <- 3
 b <- 1 - a/12
 shift <- 0
-sigma <- 0.5
-
+sigma <- 0.1
 
 tic()
 result <- mclapply(seq_len(rout), function(rep) {
@@ -31,9 +30,10 @@ x_obs <- sort(points_dist(n = x_length))
 #                    norm_factor = sqrt(1/2), xi_dist = xi_cdf, df = 1)
 #x_list <- kl_rd_poly(k = n_basis, x = x_obs, lambda_rate = lambda_pow)
 x_list <- bm_kl_rd(k = n_basis, x = x_obs, lambda_rate = lambda_pow,
-                   norm_factor = sqrt(1/2), xi_dist = xi_cdf, df = 1)
+                   norm_constant = 0, norm_factor = sqrt(1/2), xi_dist = xi_cdf,
+                   df = 4)
 
-lag <- 0
+lag <- 1
 eta <- rnorm(length(x_list$x) + lag)
 em <- RcppRoll::roll_sum(x = eta, n = lag + 1) / sqrt(lag + 1)
 
@@ -116,26 +116,23 @@ list(exact_count = exact_count,
 }, mc.cores = 5)
 toc()
 
+
+# Mean Absolute Errors =========================================================
 mc_err_mat <- t(sapply(result, function(r) r$mc_err[1:5]))
 colnames(mc_err_mat) <- paste0("xi", seq_len(5))
 pace_err_mat <- t(sapply(result, function(r) r$pace_err[1:5]))
 colnames(pace_err_mat) <- paste0("xi", seq_len(5))
 
-# Convert matrices to data frames
 df1 <- as.data.frame(mc_err_mat)
 df2 <- as.data.frame(pace_err_mat)
 
-# Add an identifier column to each data frame
 df1$Source <- "mc"
 df2$Source <- "pace"
 
-# Combine the two data frames
 combined_df <- rbind(df1, df2)
 
-# Melt the combined data frame for ggplot2
 melted_df <- melt(combined_df, id.vars = "Source")
 
-# Create the boxplot
 ggplot(melted_df, aes(x = variable, y = value, fill = Source)) +
   geom_boxplot() +
   theme_minimal() +
@@ -144,8 +141,7 @@ ggplot(melted_df, aes(x = variable, y = value, fill = Source)) +
 
 
 
-
-# Check bias vs variance
+# Check bias vs variance ======================================================
 bias_mc <- t(sapply(result, function(r) r$bias_mc[1:5]))
 colnames(bias_mc) <- paste0("xi", seq_len(5))
 bias_pace <- t(sapply(result, function(r) r$bias_pace[1:5]))
@@ -172,22 +168,10 @@ ggplot(melted_df, aes(x = variable, y = value, fill = Source)) +
 
 
 
-
-
-# Check coverage
+# Check coverage ================================================================
 exact_coverage <- Reduce('+', purrr::map(result, ~.x$exact_count))
 lim_coverage <- Reduce('+', purrr::map(result, ~.x$lim_count))
 pace_coverage <- Reduce('+', purrr::map(result, ~.x$pace_count))
 
 
-purrr::map(result, ~.x$mc_err[1:10]) |>
-  (\(x) Reduce('+', x) / length(x))()
 
-purrr::map(result, ~.x$pace_err[1:10]) |>
-  (\(x) Reduce('+', x) / length(x))()
-
-purrr::map(result, ~.x$width_exact[1:10]) |>
-  (\(x) Reduce('+', x) / length(x))()
-
-purrr::map(result, ~.x$width_pace[1:10]) |>
-  (\(x) Reduce('+', x) / length(x))()
