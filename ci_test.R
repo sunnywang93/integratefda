@@ -21,6 +21,15 @@ b <- 1 - a/12
 shift <- 0
 sigma <- 0.1
 
+x_cov <- seq(0, 1, length.out = 301)
+# Generate large sample of curves to construct "true" covariance matrix
+cov_pace <- purrr::map(seq_len(3000),
+                     ~bm_kl_rd(k = n_basis, x = x_cov, lambda_rate = 2.8,
+                               norm_constant = 0, norm_factor = 0)) |>
+  purrr::map(~tcrossprod(.x$x)) |>
+  (\(x) Reduce('+', x) / length(x))()
+
+
 tic()
 result <- mclapply(seq_len(rout), function(rep) {
 
@@ -53,12 +62,22 @@ psi_list <- list(t = x_obs,
                  X = sqrt(2) * sin(outer(pi * x_obs, seq_len(n_basis) - 0.5)))
 
 
-#pace_noise <- sigma^2 * sum(lambda)
-pace_noise <- sigma^2
-Sigma_mat <- lapply(seq_len(n_basis),
-                    function(j) lambda[j] * tcrossprod(psi_list$X[, j])) |>
-  (\(x) Reduce('+', x))() |>
-  (\(x) x + pace_noise * diag(nrow = nrow(x), ncol = ncol(x)))()
+pace_noise <- 0.1
+
+
+x_obs_bi <- expand.grid(y = x_obs,
+                        x = x_obs)
+
+cov_pace_rd <- pracma::interp2(x = x_cov,
+                               y = x_cov,
+                               Z = cov_pace,
+                               xp = x_obs_bi[, 2],
+                               yp = x_obs_bi[, 1]) |>
+  matrix(nrow = length(x_obs),
+         ncol = length(x_obs))
+
+Sigma_mat <- cov_pace_rd + pace_noise * diag(nrow = nrow(cov_pace_rd),
+                                             ncol = ncol(cov_pace_rd))
 
 
 pdf_list <- list(t = x_obs,

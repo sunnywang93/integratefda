@@ -1,4 +1,4 @@
-#' Compute scores using leave-one-out control neighbours monte carlo integration
+#' Compute scores using leave-one-out control neighbours integration method.
 #'
 #' @param y_list List of the observations, containing the elements:
 #' - **$t** Vector of sampling points.

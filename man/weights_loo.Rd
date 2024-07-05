@@ -2,7 +2,7 @@
 % Please edit documentation in R/weights.R
 \name{weights_loo}
 \alias{weights_loo}
-\title{Compute unnormalised weights for leave-one-out control neighbours}
+\title{Compute weights for leave-one-out control neighbours}
 \usage{
 weights_loo(x, cdf = identity)
 }
@@ -15,5 +15,5 @@ weights_loo(x, cdf = identity)
 List, containing the associated weights for each sampling point.
 }
 \description{
-Compute unnormalised weights for leave-one-out control neighbours
+Compute weights for leave-one-out control neighbours
 }

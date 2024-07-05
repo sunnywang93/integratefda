@@ -129,7 +129,7 @@ cum_vol_unif <- function(x) {
 
 }
 
-#' Compute unnormalised weights for leave-one-out control neighbours
+#' Compute weights for leave-one-out control neighbours
 #'
 #' @param x Vector of sampling points.
 #' @param cdf Function, representing the cumulative distribution function.

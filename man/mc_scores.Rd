@@ -2,7 +2,7 @@
 % Please edit documentation in R/scores.R
 \name{mc_scores}
 \alias{mc_scores}
-\title{Compute scores using leave-one-out control neighbours monte carlo integration}
+\title{Compute scores using leave-one-out control neighbours integration method.}
 \usage{
 mc_scores(y_list, mu_list, psi_list, pdf_list, cdf, noise_sd)
 }
@@ -46,5 +46,5 @@ noise that can depend on the design points.}
 Vector containing the estimated scores.
 }
 \description{
-Compute scores using leave-one-out control neighbours monte carlo integration
+Compute scores using leave-one-out control neighbours integration method.
 }
