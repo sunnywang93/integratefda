@@ -9,7 +9,7 @@ library(dplyr)
 # Parameter settings
 k <- 50
 xobs_len <- 101
-poly_rate <- 2
+poly_rate <- 3
 intercept <- 0
 rout <- 500
 
@@ -96,5 +96,79 @@ ggplot(df, aes(x = group, y = values, fill = group)) +
   geom_boxplot() +
   labs(title = "Mean Absolute Ratio (Log scale)", x = "Method", y = "Err") +
   theme_minimal()
+
+
+# Confidence intervals with noise ==============================================
+conf_level <- 0.99
+
+tic()
+result_ci <- mclapply(seq_len(rout), function(rep) {
+
+sigma <- 0.1
+xobs <- sort(runif(n = xobs_len))
+
+# Compute true response using sample path
+xi <- bm_kl_rd(k = k, x = xobs,
+               lambda_rate = poly_rate)
+
+phi_basis <- sqrt(2) * sin(pi * outer(xobs, seq_len(50) - 0.5))
+yi <- sum(phi_coef * xi$xi)
+slope_obs <- rowSums(sweep(phi_basis, 2, phi_coef, FUN = "*"))
+
+# Construct noisy online set
+zi <- list(t = xi$t,
+           x = xi$x + sigma * rnorm(n = length(xi$t), mean = 0, sd = 1)
+           )
+# Estimate response with control neighbours
+pdf_list <- list(t = xobs,
+                 x = rep(1, length(xobs)))
+
+varphi <- slope_obs * zi$x / pdf_list$x
+
+yi_hat_mc <- mc_int(x = xi$t,
+                    varphi = varphi,
+                    cdf = identity)
+
+varphi_sigma <- slope_obs * sigma / pdf_list$x
+
+varphi_list <- list(weights = yi_hat_mc$weights,
+                    varphi_int = yi_hat_mc$varphi_int,
+                    varphi_noise = varphi_sigma)
+
+ci_mc_exact <- mc_ci(varphi_noise = varphi_list,
+                     conf_level = conf_level,
+                     lim = FALSE)
+
+ci_mc_lim <- mc_ci(varphi_noise = varphi_list,
+                   conf_level = conf_level,
+                   lim = TRUE)
+
+
+coverage_exact <- ((yi >= ci_mc_exact$ci_l) & (yi <= ci_mc_exact$ci_u)) |
+  ((yi <= ci_mc_exact$ci_l) & (yi >= ci_mc_exact$ci_u))
+
+coverage_lim <- ((yi >= ci_mc_exact$ci_l) & (yi <= ci_mc_exact$ci_u)) |
+  ((yi <= ci_mc_exact$ci_l) & (yi >= ci_mc_exact$ci_u))
+
+list(ci_exact_count = coverage_exact,
+     ci_lim_count = coverage_lim,
+     width_ci_exact = ci_mc_exact$width,
+     width_ci_lim = ci_mc_lim$width)
+
+}, mc.cores = 5)
+toc()
+
+#check coverage
+exact_coverage <- sum(purrr::map_lgl(result_ci, ~.x$ci_exact_count))
+width_exact <- mean(purrr::map_dbl(result_ci, ~.x$width_ci_exact))
+
+lim_coverage <- sum(purrr::map_lgl(result_ci, ~.x$ci_lim_count))
+width_lim <- mean(purrr::map_dbl(result_ci, ~.x$width_ci_lim))
+
+
+# Confidence intervals without noise ===========================================
+
+
+
 
 
