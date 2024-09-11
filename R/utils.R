@@ -64,6 +64,32 @@ confint_pace <- function(scores_vec, lambda_vec, phi_list, Sigma_mat, conf_level
 
 }
 
+#' Computes metric for binary classifiers
+#'
+#' @param y_hat Vector, the predicted classes.
+#' @param y_true Vector, the true classes.
+#' @param type String, either `f1` or `accuracy`.
+#' @returns Numeric.
+#' @export
+
+class_score <- function(y_hat, y_true, type = "f1") {
+
+  conf_matrix <- table(y_hat, y_true)
+  tp <- conf_matrix[2, 2]
+  fp <- conf_matrix[2, 1]
+  fn <- conf_matrix[1, 2]
+  tn <- conf_matrix[1, 1]
+
+  precis <- tp / (tp + fp)
+  recall <- tp / (tp + fn)
+
+  if(type == "f1") {
+    2 * precis * recall / (precis + recall)
+  } else {
+    (tp + tn) / (tp + tn + fp + fn)
+  }
+
+}
 
 
 

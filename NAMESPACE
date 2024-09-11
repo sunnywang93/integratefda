@@ -2,6 +2,7 @@
 
 export(bm_kl_rd)
 export(boat_cdf)
+export(class_score)
 export(confint_lim)
 export(confint_mc)
 export(confint_pace)

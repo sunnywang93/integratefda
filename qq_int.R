@@ -1,3 +1,5 @@
+library(mcscores)
+
 xobs_len <- 101
 k <- 50
 poly_rate <- 3

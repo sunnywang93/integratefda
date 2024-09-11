@@ -158,7 +158,56 @@ mc_pi <- function(varphi, varphi_int, eps = 0.05, s,
        pi_u = max(pi_l, pi_u),
        width = abs(pi_u - pi_l))
 
+}
+
+
+#' Estimate the integral for functional data with bivariate support using
+#' control neighbours
+#'
+#' @param X_list List, containing the following elements:
+#' -**$t** Data Frame, with each row containing the coordinates of the sampling
+#' point, with columns `t1` and `t2`.
+#' -**$x** Vector of observed points, where each point is associated with each
+#' row of coordinates in `t`.
+#' @returns Vector, with elements containing the estimated integral of each
+#' element in `X_list`.
+#' @export
+
+mc_int2d <- function(X_list) {
+
+  # Query the 2-NN and obtains ids for LOO-1NN
+  nn_id <- purrr::map(X_list, ~RANN::nn2(data = .x$t,
+                                         query = .x$t,
+                                         k = 2,
+                                         eps = 0)$nn.idx[, 2])
+
+  # Compute the control variate term
+  d_term <- purrr::map2_dbl(X_list, nn_id, ~mean(.x$x[.y]))
+
+  # Compute Voronoi volumes
+  voronoi_list <- purrr::map(X_list, ~deldir::deldir(x = .x$t$t1, y = .x$t$t2))
+
+  tiles_list <- purrr::map(voronoi_list, ~deldir::tile.list(.x))
+
+  vol_list <- purrr::map(tiles_list, function(tile) {
+    purrr::map_dbl(tile, ~.x$area)
+  })
+
+  # Compute the control variate integral estimate
+  v_term <- purrr::map2_dbl(X_list, vol_list, ~sum(.x$x * .y))
+
+  mean_phi <- purrr::map_dbl(X_list, ~mean(.x$x))
+
+  # Compute and return the control neighbour estimate
+  mean_phi + v_term - d_term
+
 
 }
+
+
+
+
+
+
 
 
