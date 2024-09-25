@@ -2,18 +2,9 @@
 % Please edit documentation in R/mc_nn.R
 \name{mc_pi}
 \alias{mc_pi}
-\title{Computes prediction intervals based on control neighbours based on bootstrap}
+\title{Computes prediction intervals based on control neighbours based on subsampling}
 \usage{
-mc_pi(
-  varphi,
-  varphi_int,
-  eps = 0.05,
-  s,
-  b_out = 200,
-  d = 1,
-  cdf = identity,
-  pow
-)
+mc_pi(varphi, varphi_int, eps = 0.05, s, b_out = 200, cdf = identity, pow)
 }
 \arguments{
 \item{varphi}{Vector, the integrand on a vector of evaluation points.}
@@ -25,9 +16,6 @@ mc_pi(
 \item{s}{Numeric, the Hölder exponent of the integrand.}
 
 \item{b_out}{Numeric, number of bootstrap replications to perform.}
-
-\item{d}{Numeric, the dimension of the design points. Only one dimension is
-implemented at the moment.}
 
 \item{cdf}{Function, indicating the cumulative distribution function of the
 design points.}
@@ -42,5 +30,5 @@ List, containing the following elements:
 }
 }
 \description{
-Computes prediction intervals based on control neighbours based on bootstrap
+Computes prediction intervals based on control neighbours based on subsampling
 }

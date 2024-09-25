@@ -104,15 +104,13 @@ mc_pi_bound <- function(varphi, varphi_int, M, L, eps, s, b = 1,
 }
 
 
-#' Computes prediction intervals based on control neighbours based on bootstrap
+#' Computes prediction intervals based on control neighbours based on subsampling
 #'
 #' @param varphi Vector, the integrand on a vector of evaluation points.
 #' @param varphi_int Numeric, the integral estimated based on control neighbours.
 #' @param eps Numeric, the error critical value.
 #' @param s Numeric, the Hölder exponent of the integrand.
 #' @param b_out Numeric, number of bootstrap replications to perform.
-#' @param d Numeric, the dimension of the design points. Only one dimension is
-#' implemented at the moment.
 #' @param cdf Function, indicating the cumulative distribution function of the
 #' design points.
 #' @returns List, containing the following elements:
@@ -123,7 +121,7 @@ mc_pi_bound <- function(varphi, varphi_int, M, L, eps, s, b = 1,
 #' @export
 #'
 mc_pi <- function(varphi, varphi_int, eps = 0.05, s,
-                  b_out = 200, d = 1, cdf = identity, pow) {
+                  b_out = 200, cdf = identity, pow) {
 
   if(missing(pow)) {
     M_tilde <- floor(length(varphi$t) / 2)
@@ -147,11 +145,11 @@ mc_pi <- function(varphi, varphi_int, eps = 0.05, s,
                                             varphi = .x$x,
                                             cdf = cdf)$varphi_int)
 
-  q_boot <- quantile(x = M_tilde^(1/2 + s/d) * (varphi_int_boot - varphi_int),
+  q_boot <- quantile(x = M_tilde^(1/2 + s) * (varphi_int_boot - varphi_int),
                      probs = c(eps/2, 1 - eps/2))
 
-  pi_l <- varphi_int + length(varphi$t)^(-1/2 - s/d) * unname(q_boot[1])
-  pi_u <- varphi_int + length(varphi$t)^(-1/2 - s/d) * unname(q_boot[2])
+  pi_l <- varphi_int + length(varphi$t)^(-1/2 - s) * unname(q_boot[1])
+  pi_u <- varphi_int + length(varphi$t)^(-1/2 - s) * unname(q_boot[2])
 
   list(varphi_int = varphi_int,
        pi_l = min(pi_l, pi_u),
@@ -164,47 +162,87 @@ mc_pi <- function(varphi, varphi_int, eps = 0.05, s,
 #' Estimate the integral for functional data with bivariate support using
 #' control neighbours
 #'
-#' @param X_list List, containing the following elements:
-#' -**$t** Data Frame, with each row containing the coordinates of the sampling
-#' point, with columns `t1` and `t2`.
+#' @param X Data frame, containing the following columns:
+#' -**$t1** Vector, containing the coordinates in `t1`.
+#' -**$t2** Vector, containing the coordinates in `t2`.
 #' -**$x** Vector of observed points, where each point is associated with each
 #' row of coordinates in `t`.
-#' @returns Vector, with elements containing the estimated integral of each
-#' element in `X_list`.
+#' @param xmin Numeric, the minimum coordinate of the `x` axis.
+#' @param xmax Numeric, the maximum coordinate of the `x` axis.
+#' @param ymin Numeric, the minimum coordinate of the `y` axis.
+#' @param ymax Numeric, the maximum coordinate of the `y` axis.
+#' @returns Numeric, the estimated integral.
 #' @export
 
-mc_int2d <- function(X_list) {
+mc_int2d <- function(X, xmin = 0, xmax = 1, ymin = 0, ymax = 1) {
 
   # Query the 2-NN and obtains ids for LOO-1NN
-  nn_id <- purrr::map(X_list, ~RANN::nn2(data = .x$t,
-                                         query = .x$t,
-                                         k = 2,
-                                         eps = 0)$nn.idx[, 2])
+  nn_id <- RANN::nn2(data = X[, c("t1", "t2")],
+                     query = X[, c("t1", "t2")],
+                     k = 2,
+                     eps = 0)$nn.idx[, 2]
 
   # Compute the control variate term
-  d_term <- purrr::map2_dbl(X_list, nn_id, ~mean(.x$x[.y]))
+  d_term <- mean(X[nn_id, ]$x, na.rm = TRUE)
 
   # Compute Voronoi volumes
-  voronoi_list <- purrr::map(X_list, ~deldir::deldir(x = .x$t$t1, y = .x$t$t2))
-
-  tiles_list <- purrr::map(voronoi_list, ~deldir::tile.list(.x))
-
-  vol_list <- purrr::map(tiles_list, function(tile) {
-    purrr::map_dbl(tile, ~.x$area)
-  })
+  voronoi_vol <- deldir::deldir(x = X$t1,
+                                y = X$t2,
+                                rw = c(xmin, xmax, ymin, ymax))$summary$dir.area
 
   # Compute the control variate integral estimate
-  v_term <- purrr::map2_dbl(X_list, vol_list, ~sum(.x$x * .y))
+  v_term <- sum(X$x * voronoi_vol, na.rm = TRUE)
 
-  mean_phi <- purrr::map_dbl(X_list, ~mean(.x$x))
+  mean_phi <- mean(X$x, na.rm = TRUE)
 
   # Compute and return the control neighbour estimate
-  mean_phi + v_term - d_term
-
+  mean_phi - d_term + v_term
 
 }
 
 
+#' Computes prediction intervals for 2D control neighbour integral estimates
+#' based on subsampling
+#'
+#' @param X Data frame, containing the following columns:
+#' -**$t1** Vector, containing the coordinates in `t1`.
+#' -**$t2** Vector, containing the coordinates in `t2`.
+#' -**$x** Vector of observed points, where each point is associated with each
+#' row of coordinates in `t`.
+#' @param X_int Numeric, the control neighbour integral estimate.
+#' @param eps Numeric, the error critical value.
+#' @param s Numeric, the Hölder exponent of the integrand.
+#' @param b_out Numeric, number of bootstrap replications to perform.
+#' @returns List, containing the following elements:
+#' - **$X_int** Numeric, the estimated integral value.
+#' - **$pi_l** Numeric, the lower bound of the prediction interval.
+#' - **$pi_u** Numeric, the upper bound of the prediction interval.
+#' - **$width** Numeric, the width of the prediction interval.
+#' @export
+
+mc_pi2d <- function(X, X_int, eps = 0.05, s, b_out = 200) {
+
+  M_star <- floor(nrow(X) / 2)
+
+  t_star_id <- sapply(seq_len(b_out), function(b) sample.int(n = nrow(X),
+                                                             size = M_star,
+                                                             replace = FALSE))
+
+  int_boot <- apply(t_star_id, 2, function(b) mc_int2d(X[b, ]))
+
+  q_boot <- quantile(x = M_star^(1/2 + s/2) * (int_boot - X_int),
+                     probs = c(eps/2, 1 - eps/2))
+
+  pi_l <- X_int + M_star^(-1/2 - s/2) * unname(q_boot[1])
+  pi_u <-  X_int + M_star^(-1/2 - s/2) * unname(q_boot[2])
+
+  list(X_int = X_int,
+       pi_l = min(pi_l, pi_u),
+       pi_u = max(pi_l, pi_u),
+       width = abs(pi_u - pi_l))
+
+
+}
 
 
 

@@ -87,6 +87,38 @@ bm_kl_rd <- function(k, x, lambda_rate, norm_constant, norm_factor, xi_dist, ...
 
 }
 
+#' Simulation brownian sheet using the Kosambi-Karhunen-Loève decomposition
+#'
+#' @param xout Data frame, consisting of:
+#' - **$t1** Vector containing the coordinates in the first dimension.
+#' - **$t2** Vector containing the coordinates in the second dimension.
+#' @param k Numeric, the number of basis functions.
+#' @returns List, containing:
+#' - **$x_obs** Data frame containing the observed points at the `(t1, t2)`
+#' coordinates.
+#' - **$xi** Matrix containing the scores.
+#' @export
+
+bs_kl <- function(xout, k, nu1 = 1, nu2 = 1) {
+
+  phi1 <- sqrt(2) * cos(outer(seq_len(k), xout$t1) * pi) / (seq_len(k) * pi)^nu1
+  phi2 <- sqrt(2) * cos(outer(seq_len(k), xout$t2) * pi) / (seq_len(k) * pi)^nu2
+  xi <- array(data = rnorm(n = nrow(phi1)^2),
+              dim = c(nrow(phi1), nrow(phi1)))
+
+  X_obs <- sapply(seq_len(ncol(phi1)), function(v) {
+      crossprod(phi1[, v], xi) %*% phi2[, v]
+    })
+
+  list(x_obs = data.frame(t1 = xout$t1,
+                          t2 = xout$t2,
+                          x = X_obs
+                          ),
+       xi_norm = xi / outer((seq_len(k) * pi)^nu1, (seq_len(k) * pi)^nu2)
+       )
+
+}
+
 
 kl_rd_poly <- function(k, x, lambda_rate) {
 
