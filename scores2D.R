@@ -1,20 +1,38 @@
 library(mcscores)
 library(parallel)
 library(tictoc)
+library(parallel)
+library(doParallel)
+library(here)
+
 k_length <- 12
 t_nvec <- c(50, 100, 200)
-nu_vec <- c(1, 1.5, 2)
+gamma_vec <- c(1, 1.5, 2)
 n_surface <- 500
+b_vec <- c(0, 1/2)
+
 param_cart <- expand.grid(t_length = t_nvec,
-                          nu = nu_vec)
+                          gamma = gamma_vec,
+                          b = b_vec)
+
+unif_trans <- function(x, b) (-(1 - b/2) + sqrt((1 - b/2)^2 + 2*b*x)) / b
+
+
+set.seed(1234)
 seeds <- sample.int(n = 10000, size = nrow(param_cart))
 
 
+n_cores <- detectCores() - 1
+cl <- makeCluster(spec = n_cores)
+registerDoParallel(cl)
+
 tic()
-result_list <- mclapply(seq_len(nrow(param_cart)), function(prow) {
+result_list <- foreach(prow = 1:nrow(param_cart),
+                       .packages = 'mcscores') %do% {
 
    t_length <- param_cart[prow, "t_length"]
-   nu <- param_cart[prow, "nu"]
+   gamma <- param_cart[prow, "gamma"]
+   b <- param_cart[prow, "b"]
 
    set.seed(seeds[prow])
    # Generate two-dimensional design points
@@ -27,121 +45,206 @@ result_list <- mclapply(seq_len(nrow(param_cart)), function(prow) {
      colnames(t_list[[i]]) <- c("t1", "t2")
    }
 
+   # Transformation for the non-uniform case - b = 0 corresponds to uniform design
+   if(b > 0) {
+     t_list <- lapply(seq_along(t_list), function(id) {
+       apply(t_list[[id]], 1, function(x) unif_trans(x, b)) |>
+         t() |>
+         as.data.frame()
+     })
+   }
+
    # Generate surfaces
-   sheets_list <- purrr::map(t_list, ~bs_kl(xout = .x, k = 12, nu1 = nu, nu2 = nu))
+   sheets_list <- purrr::map(t_list,
+                             ~bs_kl(xout = .x, k = 12,
+                                    gamma1 = gamma, gamma2 = gamma))
 
-   lapply(sheets_list, function(sheet) {
-     phi1 <- sqrt(2) * cos(outer(seq_len(k_length), sheet$x_obs$t1) * pi)
-     phi2 <- sqrt(2) * cos(outer(seq_len(k_length), sheet$x_obs$t2) * pi)
-     phi_big <- sapply(seq_len(ncol(phi1)),
-                       function(x) outer(phi1[, x], phi2[, x]),
-                       simplify = "array")
-
-     int_sheet <- sheet$x_obs * phi_big[ind_mat[id, 1],ind_mat[id, 2],]
-     varphi <- mc_int2d(int_sheet)
-
-   })
-
-
-   # Construct basis functions
-   phi1_list <- purrr::map(sheets_list,
-                           ~sqrt(2) * cos(outer(seq_len(k_length),
-                                                .x$x_obs$t1) * pi))
-
-   phi2_list <- purrr::map(sheets_list,
-                           ~sqrt(2) * cos(outer(seq_len(k_length),
-                                                .x$x_obs$t2) * pi))
 
    ind_mat <- rbind(c(1, 1), c(2, 2), c(3, 3))
 
-   phi_big <- purrr::map2(phi1_list, phi2_list,
-                          ~sapply(seq_len(ncol(.x)), function(z) {
-                            outer(.x[, z], .y[, z])},
-                            simplify = "array"))
+   mc_list <- foreach(s_id = seq_along(sheets_list),
+                      .packages = 'mcscores') %dopar% {
 
-   mc_list <- lapply(seq_len(nrow(ind_mat)), function(id) {
-     # Construct integrands for scores
-     varphi_list <- purrr::map2(sheets_list, phi_big,
-                                ~.x$x_obs$x * .y[ind_mat[id, 1],ind_mat[id, 2],]
-                                )
+     sapply(seq_len(nrow(ind_mat)), function(id) {
+       phi1 <- sqrt(2) * cos(outer(seq_len(k_length), sheets_list[[s_id]]$x_obs$t1) * pi)
+       phi2 <- sqrt(2) * cos(outer(seq_len(k_length), sheets_list[[s_id]]$x_obs$t2) * pi)
+       phi_big <- sapply(seq_len(ncol(phi1)),
+                         function(x) outer(phi1[, x], phi2[, x]),
+                         simplify = "array")
 
-     varphi_list2 <- purrr::map2(sheets_list, varphi_list, function(x, y) {
-       x$x_obs$x <- y
-       return(x)
-     })
+       # sheets_list[[s_id]]$x_obs$x <- sheets_list[[s_id]]$x_obs$x *
+       #   phi_big[ind_mat[id, 1],ind_mat[id, 2],]
 
-     purrr::map_dbl(varphi_list2, ~mc_int2d(.x$x_obs))
+       sheets_list[[s_id]]$x_obs$x <- sheets_list[[s_id]]$x_obs$x *
+         phi_big[ind_mat[id, 1],ind_mat[id, 2],] /
+         (((1 - b/2) + b * sheets_list[[s_id]]$x_obs$t1) *
+            ((1 - b/2) + b * sheets_list[[s_id]]$x_obs$t2))
 
-     # Apply methods and save results
-     data.frame(mc_hat = mc_int2d(varphi_list2),
-                mu_hat = purrr::map_dbl(varphi_list2, ~mean(.x$x_obs$x)),
-                xi_true = purrr::map_dbl(sheets_list,
-                                         ~.x$xi[ind_mat[id, 1],ind_mat[id, 2]]),
-                group = paste("xi", paste0(ind_mat[id, ], collapse = "."),
-                              sep = "_"),
-                n = t_length,
-                nu = nu
-                )
+       mc_hat <- mc_int2d(sheets_list[[s_id]]$x_obs)
+
+       mc_pi <- mc_pi2d(X = sheets_list[[s_id]]$x_obs,
+                        X_int = mc_hat,
+                        s = min(gamma - 0.5, 1),
+                        b_out = 1000)
+
+       mu_hat <- mean(sheets_list[[s_id]]$x_obs$x, na.rm = TRUE)
+       mu_pi <- mc_pi2d(X = sheets_list[[s_id]]$x_obs,
+                        X_int = mu_hat,
+                        s = 0,
+                        b_out = 1000)
+
+       riemann_hat <- riemann_2d(X = sheets_list[[s_id]]$x_obs)
+
+       riemann_pi <- mc_pi2d(X = sheets_list[[s_id]]$x_obs,
+                             X_int = mu_hat,
+                             s = -1 + min(gamma - 0.5, 1) ,
+                             b_out = 1000)
+
+       c(mc_hat = mc_hat,
+         mu_hat = mu_hat,
+         riemann_hat = riemann_hat,
+         xi_true = sheets_list[[s_id]]$xi_norm[ind_mat[id, 1], ind_mat[id, 2]],
+         n = t_length,
+         gamma = gamma,
+         b = b,
+         pi_l = mc_pi$pi_l,
+         pi_u = mc_pi$pi_u,
+         width = mc_pi$width,
+         pi_l_mu = mu_pi$pi_l,
+         pi_u_mu = mu_pi$pi_u,
+         width_mu = mu_pi$width,
+         pi_l_riemann = riemann_pi$pi_l,
+         pi_u_riemann = riemann_pi$pi_u,
+         width_riemann = riemann_pi$width)
+     }) |>
+       t()
+   }
+
+   xi_names <- paste0("xi",
+                      apply(ind_mat, 1, function(x) paste0(x, collapse = ".")))
+
+   result_df <- purrr::map(mc_list, function(x) {
+     mc_df <- as.data.frame(x)
+     mc_df$group <- xi_names
+     mc_df
    })
 
-   do.call('rbind', mc_list)
+   result_df
 
-}, mc.cores = detectCores() - 1)
+}
+
 toc()
-
-sum(1 / (outer(seq_len(3)^(2*nu) , seq_len(3)^(2*nu)))) /
-  sum(1 / (outer(seq_len(200)^(2*nu) , seq_len(200)^(2*nu))))
+stopCluster(cl)
 
 # analysis of results ========================================================
+
+result_df <- do.call('rbind', purrr::map(result_list, ~do.call('rbind', .x)))
+
+sapply(gamma_vec, function(gamma) {
+  sum(1 / (outer(seq_len(5)^(2*gamma) , seq_len(5)^(2*gamma)))) /
+    sum(1 / (outer(seq_len(200)^(2*gamma) , seq_len(200)^(2*gamma))))
+})
+
+
 library(tibble)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(xtable)
+library(stringr)
 
-result_combined <- as_tibble(do.call('rbind', result_list)) |>
-  mutate(mc = abs(mc_hat - xi_true) ,
-         mu = abs(mu_hat - xi_true))
+result_combined <- as_tibble(result_df) |>
+  mutate(mc_err = abs(mc_hat - xi_true),
+         mu_err = abs(mu_hat - xi_true),
+         riemann_err = abs(riemann_hat - xi_true),
+         mu = log(mc_err / mu_err),
+         riemann = log(mc_err / riemann_err),
+         coverage = (xi_true >= pi_l & xi_true <= pi_u),
+         coverage_mu = (xi_true >= pi_l_mu & xi_true <= pi_u_mu),
+         coverage_riemann = (xi_true >= pi_l_riemann & xi_true <= pi_u_riemann))
 
 
 box_list <- lapply(seq_len(nrow(param_cart)), function(k) {
   result_combined |>
-    filter(nu == param_cart[k, "nu"], n == param_cart[k, "t_length"]) |>
-    ggplot(aes(x = group, y = ratio)) +
-    geom_boxplot() +
-    xlab("Scores") +
-    ylab("Difference") +
-    ggtitle(paste0("M = ",
-                   param_cart[k, "t_length"], ", Nu = ",
-                   param_cart[k, "nu"])) +
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5))
+  filter(gamma == param_cart[k, "gamma"], n == param_cart[k, "t_length"],
+         b == param_cart[k, "b"]) |>
+  select(group, mu, riemann) |>
+  pivot_longer(cols = c("mu", "riemann"),
+               names_to = "Denom",
+               values_to = "ratio") |>
+  ggplot(aes(x = group, y = ratio, fill = Denom)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, col = "red") +
+  scale_fill_grey(start = 0.3, end = 0.9) +
+  ylab("Log MAE") +
+  xlab("Scores") +
+  ggtitle(paste0("M = ",
+                 param_cart[k, "t_length"], ", gamma = ",
+                 param_cart[k, "gamma"], ", b = ", param_cart[k, "b"])) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
 })
 
+# gridExtra::grid.arrange(grobs = box_list)
+#
+# patchwork::wrap_plots(box_list, ncol = 3, nrow = 3) +
+#   patchwork::plot_layout(guides = "collect")
+# box_list <- lapply(seq_len(nrow(param_cart)), function(k) {
+#   result_combined |>
+#     filter(gamma == param_cart[k, "gamma"], n == param_cart[k, "t_length"]) |>
+#     ggplot(aes(x = group, y = ratio)) +
+#     geom_boxplot() +
+#     xlab("Scores") +
+#     ylab("Log Absolute Ratio") +
+#     ggtitle(paste0("M = ",
+#                    param_cart[k, "t_length"], ", gamma = ",
+#                    param_cart[k, "gamma"])) +
+#     theme_minimal() +
+#     theme(plot.title = element_text(hjust = 0.5))
+# })
 
-mc_ref <- result_combined |>
-  filter(n == 200, nu == 1) |>
-  select(mc)
 
-mc_1 <- result_combined |>
-  filter(n == 200, nu == 1.5) |>
-  select(mc)
+box_titles <- sapply(box_list, function(x) str_replace_all(x$labels[1],
+                                                           pattern = " ",
+                                                           repl = "") |>
+                      str_replace_all(pattern = "=", repl = "") |>
+                       str_replace_all(pattern = ",", repl = "_"))
 
-mc_2 <- result_combined |>
-  filter(n == 200, nu == 2) |>
-  select(mc)
+library(tikzDevice)
+for(i in 1:length(box_list)) {
+  tikz(file = paste0(here(), "/score_box_",
+                     box_titles[[i]], ".tex"),
+       width = 5,
+       height = 5,
+       standAlone = TRUE)
+  plot(box_list[[i]])
+  dev.off()
+}
 
-par(mfrow = c(1, 2))
-boxplot(log(mc_1$mc / mc_ref$mc))
-boxplot(log(mc_2$mc / mc_ref$mc))
 
-library(patchwork)
-wrap_plots(box_list, nrow = 3, ncol = 3) +
-  plot_layout(guides = "collect")
+cov_tab <- result_combined |>
+  group_by(n, gamma, group, b) |>
+  summarise(cov_mc = sum(coverage) / n() * 100,
+            cov_mu = sum(coverage_mu) / n() * 100,
+            cov_riemann = sum(coverage_riemann) / n() * 100,
+            .groups = "keep")
 
-wrap_plots(box_list[1:3], nrow = 1, ncol = 3) +
-  plot_layout(guides = "collect")
-wrap_plots(box_list[4:6], nrow = 1, ncol = 3) +
-  plot_layout(guides = "collect")
-wrap_plots(box_list[7:9], nrow = 1, ncol = 3) +
-  plot_layout(guides = "collect")
+cov_tab$n <- as.integer(cov_tab$n)
 
+
+width_tab <- result_combined |>
+  group_by(n, gamma, group, b) |>
+  summarise(width_mc = mean(width),
+            width_mu = mean(width_mu),
+            width_riemann = mean(width_riemann),
+            ratio_mu = (width_mc - width_mu) / width_mu,
+            ratio_riemann = (width_mc - width_riemann) / width_riemann,
+            .groups = "keep") |>
+  select(n, gamma, group, b, ratio_mu, ratio_riemann)
+
+
+width_tab$n <- as.integer(width_tab$n)
+
+
+xtable(cov_tab, digits = 1)
+xtable(width_tab, digits = 4)

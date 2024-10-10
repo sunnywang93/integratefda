@@ -205,9 +205,9 @@ mc_int2d <- function(X, xmin = 0, xmax = 1, ymin = 0, ymax = 1) {
 #' based on subsampling
 #'
 #' @param X Data frame, containing the following columns:
-#' -**$t1** Vector, containing the coordinates in `t1`.
-#' -**$t2** Vector, containing the coordinates in `t2`.
-#' -**$x** Vector of observed points, where each point is associated with each
+#' - **$t1** Vector, containing the coordinates in `t1`.
+#' - **$t2** Vector, containing the coordinates in `t2`.
+#' - **$x** Vector of observed points, where each point is associated with each
 #' row of coordinates in `t`.
 #' @param X_int Numeric, the control neighbour integral estimate.
 #' @param eps Numeric, the error critical value.
@@ -224,17 +224,17 @@ mc_pi2d <- function(X, X_int, eps = 0.05, s, b_out = 200) {
 
   M_star <- floor(nrow(X) / 2)
 
-  t_star_id <- sapply(seq_len(b_out), function(b) sample.int(n = nrow(X),
-                                                             size = M_star,
-                                                             replace = FALSE))
+  t_star_id <- sapply(seq_len(b_out), function(b) {
+    sample.int(n = nrow(X), size = M_star, replace = FALSE)
+  })
 
   int_boot <- apply(t_star_id, 2, function(b) mc_int2d(X[b, ]))
 
   q_boot <- quantile(x = M_star^(1/2 + s/2) * (int_boot - X_int),
                      probs = c(eps/2, 1 - eps/2))
 
-  pi_l <- X_int + M_star^(-1/2 - s/2) * unname(q_boot[1])
-  pi_u <-  X_int + M_star^(-1/2 - s/2) * unname(q_boot[2])
+  pi_l <- X_int + nrow(X)^(-1/2 - s/2) * unname(q_boot[1])
+  pi_u <-  X_int + nrow(X)^(-1/2 - s/2) * unname(q_boot[2])
 
   list(X_int = X_int,
        pi_l = min(pi_l, pi_u),
@@ -244,7 +244,30 @@ mc_pi2d <- function(X, X_int, eps = 0.05, s, b_out = 200) {
 
 }
 
+#' Compute Riemann sum estimates based on Voronoi partition
+#'
+#' @param X Data frame, containing the following columns:
+#' -**$t1** Vector, containing the coordinates in `t1`.
+#' -**$t2** Vector, containing the coordinates in `t2`.
+#' -**$x** Vector of observed points, where each point is associated with each
+#' row of coordinates in `t`.
+#' @param xmin Numeric, the minimum coordinate of the `x` axis.
+#' @param xmax Numeric, the maximum coordinate of the `x` axis.
+#' @param ymin Numeric, the minimum coordinate of the `y` axis.
+#' @param ymax Numeric, the maximum coordinate of the `y` axis.
+#' @returns Numeric, the estimated integral.
+#' @export
 
+riemann_2d <- function(X, xmin = 0, xmax = 1, ymin = 0, ymax = 1) {
+
+  voronoi_vol <- deldir::deldir(x = X$t1,
+                                y = X$t2,
+                                rw = c(xmin, xmax, ymin, ymax))$summary$dir.area
+
+  sum(X$x * voronoi_vol, na.rm = TRUE)
+
+
+}
 
 
 

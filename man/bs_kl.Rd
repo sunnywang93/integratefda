@@ -4,7 +4,7 @@
 \alias{bs_kl}
 \title{Simulation brownian sheet using the Kosambi-Karhunen-Loève decomposition}
 \usage{
-bs_kl(xout, k, nu1 = 1, nu2 = 1)
+bs_kl(xout, k, gamma1 = 1, gamma2 = 1)
 }
 \arguments{
 \item{xout}{Data frame, consisting of:
@@ -14,6 +14,12 @@ bs_kl(xout, k, nu1 = 1, nu2 = 1)
 }}
 
 \item{k}{Numeric, the number of basis functions.}
+
+\item{gamma1}{Numeric, the rate of decay of the square root of eigenvalues in
+the first dimension.}
+
+\item{gamma2}{Numeric, the rate of decay of the square root of eigenvalues in
+the second dimension.}
 }
 \value{
 List, containing:

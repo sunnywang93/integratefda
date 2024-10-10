@@ -93,16 +93,20 @@ bm_kl_rd <- function(k, x, lambda_rate, norm_constant, norm_factor, xi_dist, ...
 #' - **$t1** Vector containing the coordinates in the first dimension.
 #' - **$t2** Vector containing the coordinates in the second dimension.
 #' @param k Numeric, the number of basis functions.
+#' @param gamma1 Numeric, the rate of decay of the square root of eigenvalues in
+#' the first dimension.
+#' @param gamma2 Numeric, the rate of decay of the square root of eigenvalues in
+#' the second dimension.
 #' @returns List, containing:
 #' - **$x_obs** Data frame containing the observed points at the `(t1, t2)`
 #' coordinates.
 #' - **$xi** Matrix containing the scores.
 #' @export
 
-bs_kl <- function(xout, k, nu1 = 1, nu2 = 1) {
+bs_kl <- function(xout, k, gamma1 = 1, gamma2 = 1) {
 
-  phi1 <- sqrt(2) * cos(outer(seq_len(k), xout$t1) * pi) / (seq_len(k) * pi)^nu1
-  phi2 <- sqrt(2) * cos(outer(seq_len(k), xout$t2) * pi) / (seq_len(k) * pi)^nu2
+  phi1 <- sqrt(2) * cos(outer(seq_len(k), xout$t1) * pi) / (seq_len(k) * pi)^gamma1
+  phi2 <- sqrt(2) * cos(outer(seq_len(k), xout$t2) * pi) / (seq_len(k) * pi)^gamma2
   xi <- array(data = rnorm(n = nrow(phi1)^2),
               dim = c(nrow(phi1), nrow(phi1)))
 
@@ -114,7 +118,7 @@ bs_kl <- function(xout, k, nu1 = 1, nu2 = 1) {
                           t2 = xout$t2,
                           x = X_obs
                           ),
-       xi_norm = xi / outer((seq_len(k) * pi)^nu1, (seq_len(k) * pi)^nu2)
+       xi_norm = xi / outer((seq_len(k) * pi)^gamma1, (seq_len(k) * pi)^gamma2)
        )
 
 }

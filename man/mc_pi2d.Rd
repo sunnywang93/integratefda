@@ -9,10 +9,12 @@ mc_pi2d(X, X_int, eps = 0.05, s, b_out = 200)
 }
 \arguments{
 \item{X}{Data frame, containing the following columns:
--\strong{$t1} Vector, containing the coordinates in \code{t1}.
--\strong{$t2} Vector, containing the coordinates in \code{t2}.
--\strong{$x} Vector of observed points, where each point is associated with each
-row of coordinates in \code{t}.}
+\itemize{
+\item \strong{$t1} Vector, containing the coordinates in \code{t1}.
+\item \strong{$t2} Vector, containing the coordinates in \code{t2}.
+\item \strong{$x} Vector of observed points, where each point is associated with each
+row of coordinates in \code{t}.
+}}
 
 \item{X_int}{Numeric, the control neighbour integral estimate.}
 
