@@ -4,7 +4,7 @@
 \alias{mc_pi}
 \title{Computes prediction intervals based on control neighbours based on subsampling}
 \usage{
-mc_pi(varphi, varphi_int, eps = 0.05, s, b_out = 200, cdf = identity, pow)
+mc_pi(varphi, varphi_int, eps = 0.05, s, b_out = 200, cdf = identity)
 }
 \arguments{
 \item{varphi}{Vector, the integrand on a vector of evaluation points.}

@@ -17,7 +17,7 @@ param_cart <- expand.grid(xobs_len = xobs_vec,
                           poly_rate = poly_vec,
                           b = b_vec)
 intercept <- 0
-rout <- 500
+rout <- 2000
 unif_trans <- function(x, b) (-(1 - b/2) + sqrt((1 - b/2)^2 + 2*b*x)) / b
 
 # Confidence intervals without noise ===========================================
@@ -93,8 +93,7 @@ result <- foreach(prow = 1:nrow(param_cart),
     ci_l_mean <- yi_hat_mean - z_value * sm
     ci_u_mean <- yi_hat_mean + z_value * sm
     width_ci_mean <- abs(ci_u_mean - ci_l_mean)
-    coverage_mean <- ((yi >= ci_l_mean) & (yi <= ci_u_mean)) |
-      ((yi <= ci_l_mean) & (yi >= ci_u_mean))
+    coverage_mean <- ((yi >= ci_l_mean) & (yi <= ci_u_mean))
 
     # Construct prediction intervals for control neighbours
     if(b > 0) {
@@ -102,19 +101,38 @@ result <- foreach(prow = 1:nrow(param_cart),
                      varphi_int = yi_hat_mc$varphi_int,
                      eps = 0.05,
                      s = min((poly_rate - 1) / 2, 1),
-                     b_out = 200,
+                     b_out = 1000,
                      cdf = function(x) (1 - b/2)*x + b*x^2/2)
     } else {
       pi_mc <- mc_pi(varphi = varphi,
                      varphi_int = yi_hat_mc$varphi_int,
                      eps = 0.05,
                      s = min((poly_rate - 1) / 2, 1),
-                     b_out = 200,
+                     b_out = 1000,
                      cdf = identity)
     }
 
-    coverage_mc <- ((yi >= pi_mc$pi_l) & (yi <= pi_mc$pi_u)) |
-      ((yi <= pi_mc$pi_l) & (yi >= pi_mc$pi_u))
+    # Prediction intervals for trapezoidal rule based on subsampling
+    pi_riemann <- pi_subsam(varphi = varphi,
+                            varphi_int = yi_hat_riemann,
+                            eps = 0.05,
+                            s = min((poly_rate - 1) / 2, 1),
+                            b_out = 1000,
+                            int_fun = pracma::trapz)
+
+    # Prediction intervals for mean based on subsampling
+    pi_mean <- pi_subsam(varphi = varphi,
+                         varphi_int = yi_hat_mean,
+                         eps = 0.05,
+                         s = min((poly_rate - 1) / 2, 1),
+                         b_out = 1000,
+                         int_fun = mean)
+
+    coverage_mc <- ((yi >= pi_mc$pi_l) & (yi <= pi_mc$pi_u))
+
+    coverage_riemann <- ((yi >= pi_riemann$pi_l) & (yi <= pi_riemann$pi_u))
+
+    coverage_mu_sub <- ((yi >= pi_mean$pi_l) & (yi <= pi_mean$pi_u))
 
 
     list(mean_diff = yi_hat_mean - yi,
@@ -122,10 +140,12 @@ result <- foreach(prow = 1:nrow(param_cart),
          riemann_diff = yi_hat_riemann - yi,
          coverage_mean = coverage_mean,
          coverage_mc = coverage_mc,
-         yi_hat_mean = yi_hat_mean,
+         coverage_riemann = coverage_riemann,
+         coverage_mu_sub = coverage_mu_sub,
          width_ci_mean = width_ci_mean,
          width_mc = pi_mc$width,
-         yi_hat_mc = yi_hat_mc$varphi_int,
+         width_riemann = pi_riemann$width,
+         width_mc_sub = pi_mean$width,
          n = xobs_len,
          nu = poly_rate,
          b = b)
@@ -136,37 +156,58 @@ toc()
 stopCluster(cl)
 
 # Estimation results ===================
-mu_diff <- purrr::map_dbl(result[[18]], ~.x$mean_diff)
-mc_diff <- purrr::map_dbl(result[[18]], ~.x$mc_diff)
-riemann_diff <- purrr::map_dbl(result[[18]], ~.x$riemann_diff)
-
 result_df <- do.call('rbind', purrr::map(result, ~do.call('rbind', .x))) |>
   apply(2, unlist) |>
   as_tibble() |>
+  mutate(mu_rel = log(abs(mc_diff / mean_diff)),
+         rie_rel = log(abs(mc_diff / riemann_diff)))
+
+saveRDS(result_df, file = paste0(here(), "/result_df_reg1D_noiseless.rds"))
+
+box_diff_list <- lapply(seq_len(nrow(param_cart)), function(k) {
+  result_df |>
+    filter(n == param_cart[k, "xobs_len"],
+           nu == param_cart[k, "poly_rate"],
+           b == param_cart[k, "b"]) |>
+    select(mean_diff, mc_diff, riemann_diff) |>
+    rename(mean = mean_diff, mc = mc_diff, riemann = riemann_diff) |>
+    pivot_longer(cols = mean:riemann,
+                 names_to = "Method",
+                 values_to = "Diff") |>
+    ggplot(aes(x = Method, y = Diff, fill = Method)) +
+    geom_boxplot() +
+    ggtitle(paste0("M = ",
+                   param_cart[k, "xobs_len"], ", nu = ",
+                   param_cart[k, "poly_rate"], ", b = ", param_cart[k, "b"])) +
+    xlab("Method") +
+    ylab("Difference") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    scale_fill_grey(start = 0.3, end = 0.99)
+})
 
 
-
-df_diff <- data.frame(
-  values = c(mu_diff, mc_diff, riemann_diff),
-  group = factor(rep(c("Mean", "NN", "Riemann"), each = rout))
-)
-
-# Sanity check
-all.equal(filter(df_diff, group == "Mean")$values, mu_diff)
-all.equal(filter(df_diff, group == "NN")$values, mc_diff)
-all.equal(filter(df_diff, group == "Riemann")$values, riemann_diff)
-
-ggplot(df_diff, aes(x = group, y = values, fill = group)) +
-  geom_boxplot() +
-  labs(title = "Bias-Variance Comparison", x = "Method", y = "Difference") +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  scale_fill_grey(start = 0.3, end = 0.99)
-
-
-
-mu_rel <- purrr::map_dbl(result, ~log(abs(.x$mc_diff / .x$mean_diff)))
-rie_rel <- purrr::map_dbl(result, ~log(abs(.x$mc_diff / .x$riemann_diff)))
+box_logmae_list <- lapply(seq_len(nrow(param_cart)), function(k) {
+  result_df |>
+    filter(n == param_cart[k, "xobs_len"],
+           nu == param_cart[k, "poly_rate"],
+           b == param_cart[k, "b"]) |>
+    select(mu_rel, rie_rel) |>
+    rename(mean = mu_rel, riemann = rie_rel) |>
+    pivot_longer(cols = mean:riemann,
+                 names_to = "Method",
+                 values_to = "Log_MAE") |>
+    ggplot(aes(x = Method, y = Log_MAE, fill = Method)) +
+    geom_boxplot() +
+    ggtitle(paste0("M = ",
+                   param_cart[k, "xobs_len"], ", nu = ",
+                   param_cart[k, "poly_rate"], ", b = ", param_cart[k, "b"])) +
+    xlab("Method") +
+    ylab("Log MAE") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    scale_fill_grey(start = 0.3, end = 0.99)
+})
 
 
 df <- data.frame(
@@ -190,10 +231,37 @@ width_mc <- purrr::map_dbl(result, ~.x$width_mc)
 width_mean <- purrr::map_dbl(result, ~.x$width_ci_mean)
 mean_cov <- purrr::map_dbl(result, ~.x$coverage_mean)
 
+
 #Check coverage and average widths
 sum(mc_cov) / rout
 sum(mean_cov) / rout
 mean(width_mc)
 mean(width_mean)
 
+result_df |>
+  select(n, nu, b,
+         coverage_mean, coverage_mc, coverage_riemann, coverage_mu_sub) |>
+  rename(mean = coverage_mean,
+         mc = coverage_mc,
+         riemann = coverage_riemann,
+         mean_sub = coverage_mu_sub) |>
+  group_by(n, nu, b) |>
+  summarise(coverage_mean = sum(mean) / rout,
+            coverage_mc = sum(mc) / rout,
+            coverage_riemann = sum(riemann) / rout,
+            coverage_mu_sub = sum(mean_sub) / rout)
+
+
+result_df |>
+  select(n, nu, b,
+         width_ci_mean, width_mc, width_riemann, width_mc_sub) |>
+  rename(mu = width_ci_mean,
+         mc = width_mc,
+         riemann = width_riemann,
+         mean_sub = width_mc_sub) |>
+  group_by(n, nu, b) |>
+  summarise(width_mean = mean(mu),
+            width_mc = mean(mc),
+            width_riemann = mean(riemann),
+            width_mu_sub = mean(mean_sub))
 

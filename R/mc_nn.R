@@ -121,14 +121,10 @@ mc_pi_bound <- function(varphi, varphi_int, M, L, eps, s, b = 1,
 #' @export
 #'
 mc_pi <- function(varphi, varphi_int, eps = 0.05, s,
-                  b_out = 200, cdf = identity, pow) {
+                  b_out = 200, cdf = identity) {
 
-  if(missing(pow)) {
-    M_tilde <- floor(length(varphi$t) / 2)
-  } else {
-    M_tilde <- floor(length(varphi$t)^(pow))
-  }
 
+  M_tilde <- floor(length(varphi$t) / 2)
 
   x_boot <- purrr::map(seq_len(b_out),
                        ~sort(sample.int(n = length(varphi$t),
@@ -268,6 +264,126 @@ riemann_2d <- function(X, xmin = 0, xmax = 1, ymin = 0, ymax = 1) {
 
 
 }
+
+#' Estimates prediction intervals using subsampling
+#'
+#' Mainly used for comparison purposes. Only works with either the sample mean
+#' or riemann sums using the trapezoidal rule.
+#'
+#' @param varphi Vector, the integrand on a vector of evaluation points.
+#' @param varphi_int Numeric, the integral estimated.
+#' @param eps Numeric, the error critical value.
+#' @param s Numeric, the Hölder exponent of the integrand.
+#' @param b_out Numeric, number of bootstrap replications to perform.
+#' @param int_fun Function, indicating the method of approximating integrals.
+#' Only `mean` and `trapz` function is accepted.
+#' @returns List, containing the following elements:
+#' - **$varphi_int** Numeric, the estimated integral value.
+#' - **$pi_l** Numeric, the lower bound of the prediction interval.
+#' - **$pi_u** Numeric, the upper bound of the prediction interval.
+#' - **$width** Numeric, the width of the prediction interval.
+#' @export
+#'
+
+pi_subsam <- function(varphi, varphi_int, eps = 0.05, s,
+                      b_out = 200, int_fun) {
+
+  M_tilde <- floor(length(varphi$t) / 2)
+
+  x_boot <- purrr::map(seq_len(b_out),
+                       ~sort(sample.int(n = length(varphi$t),
+                                        size = M_tilde,
+                                        replace = FALSE)
+                       )
+  )
+
+  varphi_boot <- purrr::map(x_boot, ~list(t = varphi$t[.x],
+                                          x = varphi$x[.x]))
+
+
+  if(identical(int_fun, mean)) {
+    varphi_int_boot <- purrr::map_dbl(varphi_boot,
+                                      ~mean(x = .x$x))
+
+    q_boot <- quantile(x = M_tilde^(1/2) * (varphi_int_boot - varphi_int),
+                       probs = c(eps/2, 1 - eps/2))
+
+    pi_l <- varphi_int + length(varphi$t)^(-1/2) * unname(q_boot[1])
+    pi_u <- varphi_int + length(varphi$t)^(-1/2) * unname(q_boot[2])
+  } else {
+    varphi_int_boot <- purrr::map_dbl(varphi_boot,
+                                      ~pracma::trapz(x = .x$t,
+                                                     y = .x$x))
+
+    q_boot <- quantile(x = M_tilde^s * (varphi_int_boot - varphi_int),
+                       probs = c(eps/2, 1 - eps/2))
+
+    pi_l <- varphi_int + length(varphi$t)^(-s) * unname(q_boot[1])
+    pi_u <- varphi_int + length(varphi$t)^(-s) * unname(q_boot[2])
+  }
+
+
+  list(varphi_int = varphi_int,
+       pi_l = min(pi_l, pi_u),
+       pi_u = max(pi_l, pi_u),
+       width = abs(pi_u - pi_l))
+
+}
+
+#' Estimates prediction intervals using subsampling for 2 dimensions.
+#'
+#' Mainly used for comparison purposes. Only works with either the sample mean
+#' or "riemann sums" using voronoi cells.
+#'
+#' @param X Data frame, containing the following columns:
+#' - **$t1** Vector, containing the coordinates in `t1`.
+#' - **$t2** Vector, containing the coordinates in `t2`.
+#' - **$x** Vector of observed points, where each point is associated with each
+#' row of coordinates in `t`.
+#' @param X_int Numeric, the control neighbour integral estimate.
+#' @param eps Numeric, the error critical value.
+#' @param s Numeric, the Hölder exponent of the integrand.
+#' @param b_out Numeric, number of bootstrap replications to perform.
+#' @param int_fun Function, indicating the method of approximating integrals.
+#' Only `mean` and `riemann_2d` function is accepted.
+#' @returns List, containing the following elements:
+#' - **$X_int** Numeric, the estimated integral value.
+#' - **$pi_l** Numeric, the lower bound of the prediction interval.
+#' - **$pi_u** Numeric, the upper bound of the prediction interval.
+#' - **$width** Numeric, the width of the prediction interval.
+#' @export
+
+pi_subsam2d <- function(X, X_int, eps = 0.05, s, b_out = 200, int_fun) {
+
+  M_star <- floor(nrow(X) / 2)
+
+  t_star_id <- sapply(seq_len(b_out), function(b) {
+    sample.int(n = nrow(X), size = M_star, replace = FALSE)
+  })
+
+
+  if(identical(int_fun, mean)) {
+    int_boot <- apply(t_star_id, 2, function(b) mean(X[b, ]$x))
+    q_boot <- quantile(x = M_star^(1/2) * (int_boot - X_int),
+                       probs = c(eps/2, 1 - eps/2))
+
+    pi_l <- X_int + nrow(X)^(-1/2) * unname(q_boot[1])
+    pi_u <-  X_int + nrow(X)^(-1/2) * unname(q_boot[2])
+  } else {
+    int_boot <- apply(t_star_id, 2, function(b) riemann_2d(X[b, ]))
+    q_boot <- quantile(x = M_star^s * (int_boot - X_int),
+                       probs = c(eps/2, 1 - eps/2))
+
+    pi_l <- X_int + nrow(X)^(-s) * unname(q_boot[1])
+    pi_u <-  X_int + nrow(X)^(-s) * unname(q_boot[2])
+  }
+
+  list(X_int = X_int,
+       pi_l = min(pi_l, pi_u),
+       pi_u = max(pi_l, pi_u),
+       width = abs(pi_u - pi_l))
+}
+
 
 
 

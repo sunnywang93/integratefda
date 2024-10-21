@@ -8,7 +8,7 @@ library(here)
 k_length <- 12
 t_nvec <- c(50, 100, 200)
 gamma_vec <- c(1, 1.5, 2)
-n_surface <- 500
+n_surface <- 1000
 b_vec <- c(0, 1/2)
 
 param_cart <- expand.grid(t_length = t_nvec,
@@ -81,24 +81,27 @@ result_list <- foreach(prow = 1:nrow(param_cart),
             ((1 - b/2) + b * sheets_list[[s_id]]$x_obs$t2))
 
        mc_hat <- mc_int2d(sheets_list[[s_id]]$x_obs)
-
        mc_pi <- mc_pi2d(X = sheets_list[[s_id]]$x_obs,
                         X_int = mc_hat,
+                        eps = 0.05,
                         s = min(gamma - 0.5, 1),
                         b_out = 1000)
 
        mu_hat <- mean(sheets_list[[s_id]]$x_obs$x, na.rm = TRUE)
-       mu_pi <- mc_pi2d(X = sheets_list[[s_id]]$x_obs,
-                        X_int = mu_hat,
-                        s = 0,
-                        b_out = 1000)
+       mu_pi <- pi_subsam2d(X = sheets_list[[s_id]]$x_obs,
+                            X_int = mu_hat,
+                            eps = 0.05,
+                            s = min(gamma - 0.5, 1),
+                            b_out = 1000,
+                            int_fun = mean)
 
        riemann_hat <- riemann_2d(X = sheets_list[[s_id]]$x_obs)
-
-       riemann_pi <- mc_pi2d(X = sheets_list[[s_id]]$x_obs,
-                             X_int = mu_hat,
-                             s = -1 + min(gamma - 0.5, 1) ,
-                             b_out = 1000)
+       riemann_pi <- pi_subsam2d(X = sheets_list[[s_id]]$x_obs,
+                                 X_int = riemann_hat,
+                                 eps = 0.05,
+                                 s = min(gamma - 0.5, 1),
+                                 b_out = 1000,
+                                 int_fun = riemann_2d)
 
        c(mc_hat = mc_hat,
          mu_hat = mu_hat,
@@ -137,8 +140,9 @@ toc()
 stopCluster(cl)
 
 # analysis of results ========================================================
-
 result_df <- do.call('rbind', purrr::map(result_list, ~do.call('rbind', .x)))
+
+saveRDS(result_df, file = paste0(here(), "/result_df_scores2D.rds"))
 
 sapply(gamma_vec, function(gamma) {
   sum(1 / (outer(seq_len(5)^(2*gamma) , seq_len(5)^(2*gamma)))) /
@@ -234,9 +238,9 @@ cov_tab$n <- as.integer(cov_tab$n)
 
 width_tab <- result_combined |>
   group_by(n, gamma, group, b) |>
-  summarise(width_mc = mean(width),
-            width_mu = mean(width_mu),
-            width_riemann = mean(width_riemann),
+  summarise(width_mc = median(width),
+            width_mu = median(width_mu),
+            width_riemann = median(width_riemann),
             ratio_mu = (width_mc - width_mu) / width_mu,
             ratio_riemann = (width_mc - width_riemann) / width_riemann,
             .groups = "keep") |>
