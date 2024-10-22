@@ -14,9 +14,11 @@ mc_int <- function(x, varphi, cdf) {
 
   if(!is.function(cdf)) {
     cdf_fun <- function(x) {
-      id <- sapply(x, function(xi) which.min(abs(xi - cdf$t)))
-      cdf$x[id]
-    }
+      pracma::interp1(x = cdf$t,
+                      y = cdf$x,
+                      xi = x,
+                      method = "linear")
+      }
   } else {
     cdf_fun <- cdf
   }
