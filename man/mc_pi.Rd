@@ -7,7 +7,11 @@
 mc_pi(varphi, varphi_int, eps = 0.05, s, b_out = 200, cdf = identity)
 }
 \arguments{
-\item{varphi}{Vector, the integrand on a vector of evaluation points.}
+\item{varphi}{List, containing the following elements:
+\itemize{
+\item \strong{$t} Vector of evaluation points.
+\item \strong{$x} Vector of observed points.
+}}
 
 \item{varphi_int}{Numeric, the integral estimated based on control neighbours.}
 
@@ -17,8 +21,12 @@ mc_pi(varphi, varphi_int, eps = 0.05, s, b_out = 200, cdf = identity)
 
 \item{b_out}{Numeric, number of bootstrap replications to perform.}
 
-\item{cdf}{Function, indicating the cumulative distribution function of the
-design points.}
+\item{cdf}{Function or list, indicating the cumulative distribution function of the
+design points. If list, should contain the following elements:
+\itemize{
+\item \strong{$t} Vector of evaluation points.
+\item \strong{$x} Vector of observed points.
+}}
 }
 \value{
 List, containing the following elements:

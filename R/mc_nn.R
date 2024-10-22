@@ -108,13 +108,17 @@ mc_pi_bound <- function(varphi, varphi_int, M, L, eps, s, b = 1,
 
 #' Computes prediction intervals based on control neighbours based on subsampling
 #'
-#' @param varphi Vector, the integrand on a vector of evaluation points.
+#' @param varphi List, containing the following elements:
+#' - **$t** Vector of evaluation points.
+#' - **$x** Vector of observed points.
 #' @param varphi_int Numeric, the integral estimated based on control neighbours.
 #' @param eps Numeric, the error critical value.
 #' @param s Numeric, the Hölder exponent of the integrand.
 #' @param b_out Numeric, number of bootstrap replications to perform.
-#' @param cdf Function, indicating the cumulative distribution function of the
-#' design points.
+#' @param cdf Function or list, indicating the cumulative distribution function of the
+#' design points. If list, should contain the following elements:
+#' - **$t** Vector of evaluation points.
+#' - **$x** Vector of observed points.
 #' @returns List, containing the following elements:
 #' - **$varphi_int** Numeric, the estimated integral value.
 #' - **$pi_l** Numeric, the lower bound of the prediction interval.
