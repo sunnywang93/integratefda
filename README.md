@@ -8,7 +8,7 @@
 
 To install the latest version from Github, please use
 
-`devtools::install_github("sunnywang93/integratefda)`
+`devtools::install_github("sunnywang93/integratefda")`
 
 Please note that `R` version >=4.1.0 is required.
 
