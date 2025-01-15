@@ -9,7 +9,7 @@ k_length <- 12
 t_nvec <- c(50, 100, 200)
 gamma_vec <- c(1, 1.5, 2)
 n_surface <- 1000
-b_vec <- c(0, 1/2)
+b_vec <- 0
 
 param_cart <- expand.grid(t_length = t_nvec,
                           gamma = gamma_vec,
@@ -22,7 +22,7 @@ set.seed(1234)
 seeds <- sample.int(n = 10000, size = nrow(param_cart))
 
 
-n_cores <- detectCores() - 1
+n_cores <- 75
 cl <- makeCluster(spec = n_cores)
 registerDoParallel(cl)
 
@@ -72,9 +72,6 @@ result_list <- foreach(prow = 1:nrow(param_cart),
                          function(x) outer(phi1[, x], phi2[, x]),
                          simplify = "array")
 
-       # sheets_list[[s_id]]$x_obs$x <- sheets_list[[s_id]]$x_obs$x *
-       #   phi_big[ind_mat[id, 1],ind_mat[id, 2],]
-
        sheets_list[[s_id]]$x_obs$x <- sheets_list[[s_id]]$x_obs$x *
          phi_big[ind_mat[id, 1],ind_mat[id, 2],] /
          (((1 - b/2) + b * sheets_list[[s_id]]$x_obs$t1) *
@@ -95,17 +92,9 @@ result_list <- foreach(prow = 1:nrow(param_cart),
                             b_out = 1000,
                             int_fun = mean)
 
-       riemann_hat <- riemann_2d(X = sheets_list[[s_id]]$x_obs)
-       riemann_pi <- pi_subsam2d(X = sheets_list[[s_id]]$x_obs,
-                                 X_int = riemann_hat,
-                                 eps = 0.05,
-                                 s = min(gamma - 0.5, 1),
-                                 b_out = 1000,
-                                 int_fun = riemann_2d)
 
        c(mc_hat = mc_hat,
          mu_hat = mu_hat,
-         riemann_hat = riemann_hat,
          xi_true = sheets_list[[s_id]]$xi_norm[ind_mat[id, 1], ind_mat[id, 2]],
          n = t_length,
          gamma = gamma,
@@ -115,10 +104,7 @@ result_list <- foreach(prow = 1:nrow(param_cart),
          width = mc_pi$width,
          pi_l_mu = mu_pi$pi_l,
          pi_u_mu = mu_pi$pi_u,
-         width_mu = mu_pi$width,
-         pi_l_riemann = riemann_pi$pi_l,
-         pi_u_riemann = riemann_pi$pi_u,
-         width_riemann = riemann_pi$width)
+         width_mu = mu_pi$width)
      }) |>
        t()
    }
@@ -162,20 +148,17 @@ result_df <- readRDS(file = paste0(here(), '/result_df_scores2D.rds'))
 result_combined <- as_tibble(result_df) |>
   mutate(mc_err = abs(mc_hat - xi_true),
          mu_err = abs(mu_hat - xi_true),
-         riemann_err = abs(riemann_hat - xi_true),
          mu = log(mc_err / mu_err),
-         riemann = log(mc_err / riemann_err),
          coverage = (xi_true >= pi_l & xi_true <= pi_u),
-         coverage_mu = (xi_true >= pi_l_mu & xi_true <= pi_u_mu),
-         coverage_riemann = (xi_true >= pi_l_riemann & xi_true <= pi_u_riemann))
+         coverage_mu = (xi_true >= pi_l_mu & xi_true <= pi_u_mu))
 
 
 box_list <- lapply(seq_len(nrow(param_cart)), function(k) {
   result_combined |>
   filter(gamma == param_cart[k, "gamma"], n == param_cart[k, "t_length"],
          b == param_cart[k, "b"]) |>
-  select(group, mu, riemann) |>
-  pivot_longer(cols = c("mu", "riemann"),
+  select(group, mu) |>
+  pivot_longer(cols = c("mu"),
                names_to = "Denom",
                values_to = "ratio") |>
   ggplot(aes(x = group, y = ratio, fill = Denom)) +
@@ -191,23 +174,6 @@ box_list <- lapply(seq_len(nrow(param_cart)), function(k) {
   theme(plot.title = element_text(hjust = 0.5))
 })
 
-# gridExtra::grid.arrange(grobs = box_list)
-#
-# patchwork::wrap_plots(box_list, ncol = 3, nrow = 3) +
-#   patchwork::plot_layout(guides = "collect")
-# box_list <- lapply(seq_len(nrow(param_cart)), function(k) {
-#   result_combined |>
-#     filter(gamma == param_cart[k, "gamma"], n == param_cart[k, "t_length"]) |>
-#     ggplot(aes(x = group, y = ratio)) +
-#     geom_boxplot() +
-#     xlab("Scores") +
-#     ylab("Log Absolute Ratio") +
-#     ggtitle(paste0("M = ",
-#                    param_cart[k, "t_length"], ", gamma = ",
-#                    param_cart[k, "gamma"])) +
-#     theme_minimal() +
-#     theme(plot.title = element_text(hjust = 0.5))
-# })
 
 
 box_titles <- sapply(box_list, function(x) str_replace_all(x$labels[1],
@@ -232,7 +198,6 @@ cov_tab <- result_combined |>
   group_by(n, gamma, group, b) |>
   summarise(cov_mc = sum(coverage) / n() * 100,
             cov_mu = sum(coverage_mu) / n() * 100,
-            #cov_riemann = sum(coverage_riemann) / n() * 100,
             .groups = "keep")
 
 cov_tab$n <- as.integer(cov_tab$n)
@@ -242,15 +207,12 @@ width_tab <- result_combined |>
   group_by(n, gamma, group, b) |>
   summarise(width_mc = median(width),
             width_mu = median(width_mu),
-            #width_riemann = median(width_riemann),
             ratio_mu = (width_mc - width_mu) / width_mu,
-            #ratio_riemann = (width_mc - width_riemann) / width_riemann,
             .groups = "keep") |>
   select(n,
          gamma,
          group,
          b,
-         #ratio_riemann,
          ratio_mu)
 
 
